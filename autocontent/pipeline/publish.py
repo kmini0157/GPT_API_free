@@ -3,7 +3,7 @@ import html
 import json
 
 
-def write_markdown(article: dict, out_path, image_name=None, audio_name=None):
+def write_markdown(article: dict, out_path, image_name=None, audio_name=None, video_name=None):
     lines = [f"# {article['title']}", ""]
     if image_name:
         lines += [f"![thumbnail]({image_name})", ""]
@@ -12,12 +12,14 @@ def write_markdown(article: dict, out_path, image_name=None, audio_name=None):
     lines += [article.get("body_md", ""), ""]
     if audio_name:
         lines += ["---", f"🔊 내레이션: `{audio_name}`", ""]
+    if video_name:
+        lines += [f"🎬 숏폼: `{video_name}`", ""]
     if article.get("tags"):
         lines += ["", "**태그:** " + " ".join(f"#{t}" for t in article["tags"])]
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_html(article: dict, out_path, image_name=None, audio_name=None):
+def write_html(article: dict, out_path, image_name=None, audio_name=None, video_name=None):
     """공유/미리보기용 단일 HTML. 의존성 없는 정적 페이지."""
     title = html.escape(article["title"])
     body = html.escape(article.get("body_md", "")).replace("\n", "<br>")
@@ -25,7 +27,13 @@ def write_html(article: dict, out_path, image_name=None, audio_name=None):
     tags = "".join(
         f'<span class="tag">#{html.escape(t)}</span>' for t in article.get("tags", [])
     )
-    img = f'<img src="{html.escape(image_name)}" alt="thumbnail">' if image_name else ""
+    # 숏폼이 있으면 영상 우선 노출, 없으면 썸네일
+    if video_name:
+        img = f'<video controls playsinline src="{html.escape(video_name)}"></video>'
+    elif image_name:
+        img = f'<img src="{html.escape(image_name)}" alt="thumbnail">'
+    else:
+        img = ""
     audio = (
         f'<audio controls src="{html.escape(audio_name)}"></audio>' if audio_name else ""
     )
@@ -35,7 +43,8 @@ def write_html(article: dict, out_path, image_name=None, audio_name=None):
 <title>{title}</title>
 <style>
   body{{max-width:720px;margin:40px auto;padding:0 20px;font-family:system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;line-height:1.7;color:#1a1a1a}}
-  img{{width:100%;border-radius:12px}}
+  img,video{{width:100%;border-radius:12px}}
+  video{{max-height:80vh;background:#000}}
   .summary{{background:#f4f6f8;border-left:4px solid #4f7cff;padding:12px 16px;border-radius:8px;margin:20px 0}}
   .tag{{display:inline-block;background:#eef1ff;color:#4f7cff;border-radius:999px;padding:4px 12px;margin:4px 4px 0 0;font-size:13px}}
   audio{{width:100%;margin-top:20px}}

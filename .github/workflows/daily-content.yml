@@ -32,15 +32,23 @@ jobs:
           python-version: "3.12"
 
       - name: Install deps
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt chromadb
+
+      - name: Ensure ffmpeg (숏폼 영상용)
+        run: ffmpeg -version >/dev/null 2>&1 || sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Refill queue from trends (best-effort)
+        continue-on-error: true
+        run: python fill_queue.py --source trends --geo KR --limit 5
 
       - name: Generate next topic
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           WRITER_MODEL: ${{ vars.WRITER_MODEL || 'gpt-4o-mini' }}
+          EMBED_MODEL: ${{ vars.EMBED_MODEL || 'text-embedding-3-small' }}
           TTS_VOICE: ${{ vars.TTS_VOICE || 'ko-KR-SunHiNeural' }}
-        run: python main.py --from-queue topics.txt --out content
+        run: python main.py --from-queue topics.txt --out content --dedupe
 
       - name: Build static site
         run: python build_site.py --src content --dest site --title "AutoContent" --desc "매일 자동 생성되는 콘텐츠"
@@ -49,7 +57,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add content
+          git add content topics.txt
           if git diff --cached --quiet; then
             echo "새로 생성된 콘텐츠 없음 — 커밋 생략"
           else

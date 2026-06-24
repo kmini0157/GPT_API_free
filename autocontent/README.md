@@ -4,19 +4,22 @@
 한 번에 만들어주는 개인용 콘텐츠 생성 도구. LLM 키 하나를 빼면 전부 무료·무가입 서비스로 돌아간다.
 
 ```
-주제 ─▶ ① 리서치(Jina, 키X) ─▶ ② 글 작성(무료 GPT키)
-     ─▶ ③ 썸네일(Pollinations, 키X) ─▶ ④ 내레이션(edge-tts, 키X)
-     ─▶ ⑤ article.md · index.html · narration.mp3 · meta.json
+트렌드 수집 ─▶ ⓪ 중복검사(벡터DB) ─▶ ① 리서치(Jina, 키X) ─▶ ② 글 작성(무료 GPT키)
+        ─▶ ③ 썸네일(Pollinations, 키X) ─▶ ④ 내레이션(edge-tts, 키X)
+        ─▶ ⑤ 숏폼 영상(ffmpeg, 9:16) ─▶ ⑥ article.md · index.html · short.mp4 · meta.json
 ```
 
 ## 무엇을 쓰나 (전부 무료)
 
 | 단계 | 서비스 | 키 필요? |
 |------|--------|----------|
+| 트렌드 수집 | Google Trends RSS / Hacker News | ❌ |
+| 중복 방지 | 무료 임베딩 API + [Chroma](https://www.trychroma.com)(없으면 JSON 폴백) | ✅ (LLM 키 재사용) |
 | 리서치 | [Jina Reader/Search](https://jina.ai) | ❌ |
 | 글 작성 | [chatanywhere 무료 GPT API](https://api.chatanywhere.tech/v1/oauth/free/render) | ✅ (무료 발급) |
 | 썸네일 | [Pollinations](https://pollinations.ai) | ❌ |
 | 내레이션 | [edge-tts](https://github.com/rany2/edge-tts) | ❌ |
+| 숏폼 영상 | ffmpeg (썸네일+내레이션 → 9:16 mp4) | ❌ |
 
 ## 설치
 
@@ -37,6 +40,8 @@ python main.py "양자컴퓨터가 RSA 암호를 깨는 원리"
 옵션:
 
 ```bash
+python main.py "주제" --dedupe        # 벡터DB로 유사 주제 중복 방지
+python main.py "주제" --no-video      # 숏폼 영상 건너뛰기
 python main.py "주제" --no-image      # 썸네일 건너뛰기
 python main.py "주제" --no-voice      # 음성 건너뛰기
 python main.py "주제" --no-research   # Jina 리서치 건너뛰기(LLM만)
@@ -100,8 +105,37 @@ python build_site.py                                     # content/ → site/
 npx wrangler pages project create autocontent   # 프로젝트 생성(1회)
 ```
 
+## 트렌드 자동 수집 (큐 자동 충전)
+
+큐를 손으로 안 채워도 트렌딩 주제를 끌어와 `topics.txt` 에 추가한다(키 불필요).
+
+```bash
+python fill_queue.py --source trends --geo KR --limit 5   # Google Trends 일일 인기검색
+python fill_queue.py --source hn --limit 5                 # Hacker News 인기글
+```
+
+이미 큐에 있는 주제는 자동으로 건너뛴다. 매일 워크플로우가 생성 직전에 한 번 실행한다.
+
+## 중복 방지 (벡터DB)
+
+`--dedupe` 를 켜면 생성 전 주제를 **무료 임베딩 API**로 벡터화해, 기존 글과의 의미 유사도가
+`DEDUPE_THRESHOLD`(기본 0.88)를 넘으면 생성을 건너뛴다. 저장소는 **Chroma**(설치 시) →
+없으면 의존성 없는 **JSON 폴백**을 자동 선택한다. 임베딩 호출이 실패하면 중복검사를 생략하고
+생성은 막지 않는다(graceful).
+
+```bash
+pip install chromadb          # 선택: Chroma 사용 시. 안 깔면 JSON 폴백
+python main.py --from-queue topics.txt --out content --dedupe
+```
+
+## 숏폼 영상화
+
+썸네일과 내레이션이 모두 있으면 ffmpeg 로 **9:16 세로 영상(`short.mp4`)**을 합성한다.
+영상이 있으면 글 페이지·갤러리에서 ▶ 배지와 함께 영상이 우선 노출된다.
+ffmpeg 가 없으면 자동으로 건너뛴다(GitHub 러너엔 기본 설치).
+
 ## 다음 확장 (로드맵)
 
-- **벡터DB 연동**: 생성한 글을 Chroma/Qdrant 에 임베딩해 주제 중복 방지·재활용
-- **숏폼화**: 썸네일 + 내레이션 → ffmpeg 로 9:16 영상 합성 후 자동 업로드
-- **트렌드 자동 수집**: 큐를 수동 관리 대신 트렌드 API/RSS 로 자동 채우기
+- **자동 업로드**: `short.mp4` → 유튜브 Shorts / 인스타 릴스 API 자동 게시
+- **드로우텍스트 자막**: 내레이션 타임코드 기반 자막 번인
+- **A/B 썸네일**: 여러 이미지 프롬프트 생성 후 클릭률로 자동 선택

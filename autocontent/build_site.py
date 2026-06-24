@@ -36,7 +36,10 @@ PAGE = """<!doctype html>
   .card{{background:#fff;border-radius:14px;overflow:hidden;text-decoration:none;color:inherit;
     box-shadow:0 1px 3px rgba(16,24,40,.08);transition:transform .15s,box-shadow .15s;display:flex;flex-direction:column}}
   .card:hover{{transform:translateY(-3px);box-shadow:0 8px 24px rgba(16,24,40,.12)}}
-  .card img{{width:100%;aspect-ratio:16/9;object-fit:cover;background:#eef1ff}}
+  .thumb{{position:relative}}
+  .card img{{width:100%;aspect-ratio:16/9;object-fit:cover;background:#eef1ff;display:block}}
+  .play{{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.7);color:#fff;
+    font-size:12px;padding:3px 9px;border-radius:999px}}
   .card-body{{padding:16px}}
   .card h2{{font-size:18px;margin:0 0 8px;line-height:1.35}}
   .summary{{color:#475467;font-size:14px;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}}
@@ -77,11 +80,13 @@ def build(src: str, dest: str, site_title: str, site_desc: str):
 
     cards = []
     for m in articles:
-        thumb = m.get("assets", {}).get("image")
+        assets = m.get("assets", {})
+        thumb = assets.get("image")
+        badge = '<span class="play">▶ 숏폼</span>' if assets.get("video") else ""
         thumb_html = (
-            f'<img src="{html.escape(m["_slug"])}/{html.escape(thumb)}" alt="">'
+            f'<div class="thumb"><img src="{html.escape(m["_slug"])}/{html.escape(thumb)}" alt="">{badge}</div>'
             if thumb
-            else '<img alt="">'
+            else f'<div class="thumb"><img alt="">{badge}</div>'
         )
         tags = "".join(
             f'<span class="tag">#{html.escape(str(t))}</span>' for t in m.get("tags", [])[:3]

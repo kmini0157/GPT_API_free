@@ -13,8 +13,10 @@ class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.chatanywhere.tech/v1").rstrip("/")
     WRITER_MODEL = os.getenv("WRITER_MODEL", "gpt-4o-mini")
+    EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
     TTS_VOICE = os.getenv("TTS_VOICE", "ko-KR-SunHiNeural")
     OUTPUT_LANG = os.getenv("OUTPUT_LANG", "한국어")
+    DEDUPE_THRESHOLD = float(os.getenv("DEDUPE_THRESHOLD", "0.88"))
 
     # 키 없이 동작하는 무료 서비스 엔드포인트
     JINA_SEARCH = "https://s.jina.ai/"

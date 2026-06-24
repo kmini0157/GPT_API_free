@@ -12,7 +12,7 @@ import re
 import sys
 from pathlib import Path
 
-from pipeline import image, publish, research, voice, write
+from pipeline import dedupe, image, publish, research, video, voice, write
 
 
 def slugify(text: str) -> str:
@@ -33,8 +33,22 @@ def pick_from_queue(queue_path: Path, out_base: Path):
     return None
 
 
-def run(topic: str, out_base="output", do_research=True, do_image=True, do_voice=True) -> Path:
-    out_dir = Path(out_base) / slugify(topic)
+def run(topic, out_base="output", do_research=True, do_image=True,
+        do_voice=True, do_video=True, do_dedupe=False):
+    slug = slugify(topic)
+
+    # ⓪ 중복 방지 — 의미상 비슷한 글이 이미 있으면 생성 스킵
+    embedding = None
+    if do_dedupe:
+        print("⓪ 중복 검사(벡터DB)…")
+        is_dup, score, embedding = dedupe.check_duplicate(topic, out_base)
+        if is_dup:
+            print(f"   ⏭ 유사 글 존재(유사도 {score:.2f}) — 생성 건너뜀")
+            return None
+        if score:
+            print(f"   신규 주제(최대 유사도 {score:.2f})")
+
+    out_dir = Path(out_base) / slug
     out_dir.mkdir(parents=True, exist_ok=True)
     print(f"\n▶ 주제: {topic}")
     print(f"  출력 폴더: {out_dir}/")
@@ -76,12 +90,24 @@ def run(topic: str, out_base="output", do_research=True, do_image=True, do_voice
         else:
             audio_name = None
 
-    # ⑤ 발행물 조립
-    print("⑤ 발행물 조립…")
-    publish.write_markdown(article, out_dir / "article.md", image_name, audio_name)
-    publish.write_html(article, out_dir / "index.html", image_name, audio_name)
+    # ⑤ 숏폼 영상 (썸네일 + 내레이션 → 9:16 mp4)
+    if do_video and image_name and audio_name:
+        print("⑤ 숏폼 영상(ffmpeg)…")
+        if video.make_short(out_dir / image_name, out_dir / audio_name, out_dir / "short.mp4"):
+            assets["video"] = "short.mp4"
+            print("   ✓ short.mp4")
+
+    # ⑥ 발행물 조립
+    print("⑥ 발행물 조립…")
+    video_name = assets.get("video")
+    publish.write_markdown(article, out_dir / "article.md", image_name, audio_name, video_name)
+    publish.write_html(article, out_dir / "index.html", image_name, audio_name, video_name)
     publish.write_meta(article, out_dir / "meta.json", assets)
     print("   ✓ article.md · index.html · meta.json")
+
+    # 중복 방지 저장소에 등록
+    if do_dedupe:
+        dedupe.register(slug, topic, out_base, embedding)
 
     print(f"\n✅ 완료 → {out_dir}/index.html 를 브라우저로 열어보세요.\n")
     return out_dir
@@ -95,6 +121,8 @@ def main():
     parser.add_argument("--no-research", action="store_true", help="Jina 리서치 건너뛰기")
     parser.add_argument("--no-image", action="store_true", help="썸네일 생성 건너뛰기")
     parser.add_argument("--no-voice", action="store_true", help="내레이션 생성 건너뛰기")
+    parser.add_argument("--no-video", action="store_true", help="숏폼 영상 생성 건너뛰기")
+    parser.add_argument("--dedupe", action="store_true", help="벡터DB로 유사 주제 중복 방지")
     args = parser.parse_args()
 
     out_base = Path(args.out)
@@ -117,6 +145,8 @@ def main():
             do_research=not args.no_research,
             do_image=not args.no_image,
             do_voice=not args.no_voice,
+            do_video=not args.no_video,
+            do_dedupe=args.dedupe,
         )
     except KeyboardInterrupt:
         print("\n중단됨.")
