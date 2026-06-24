@@ -57,9 +57,51 @@ output/양자컴퓨터가-rsa-암호를-깨는-원리/
 
 `meta.json` 은 다음 단계 자동화(블로그/유튜브 자동 발행 봇)가 그대로 읽어 쓸 수 있도록 구조화돼 있다.
 
+## 자동 발행 + 매일 스케줄링 (핵심)
+
+"생성"에서 끝나지 않고, **매일 알아서 콘텐츠가 쌓이고 사이트로 배포**되게 만든다.
+
+```
+topics.txt 큐 ─▶ 매일 cron(GitHub Actions) ─▶ 미생성 주제 1건 생성
+            ─▶ content/ 에 커밋(누적 보관) ─▶ build_site.py 로 site/ 빌드
+            ─▶ Cloudflare Pages 자동 배포
+```
+
+- **`topics.txt`**: 주제 큐. 채워두면 매일 위에서부터 아직 안 만든 주제를 1건씩 처리.
+- **`content/`**: 생성 결과가 누적되는 보관 폴더(레포에 커밋됨).
+- **`build_site.py`**: `content/` → 갤러리형 정적 사이트 `site/` 빌드(의존성 0).
+
+### 로컬에서 사이트 빌드
+
+```bash
+python main.py --from-queue topics.txt --out content   # 다음 주제 1건 생성
+python build_site.py                                     # content/ → site/
+# site/index.html 을 열면 전체 글 갤러리
+```
+
+### GitHub Actions 설정 (`.github/workflows/daily-content.yml`)
+
+매일 06:00 KST 자동 실행. 활성화하려면 레포 **Settings → Secrets and variables → Actions** 에 등록:
+
+| 종류 | 이름 | 값 |
+|------|------|-----|
+| Secret | `OPENAI_API_KEY` | chatanywhere 무료 키 |
+| Secret | `OPENAI_BASE_URL` | `https://api.chatanywhere.tech/v1` (선택) |
+| Secret | `CLOUDFLARE_API_TOKEN` | Cloudflare Pages 배포 토큰 (선택) |
+| Secret | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 계정 ID (선택) |
+| Variable | `WRITER_MODEL` / `TTS_VOICE` | 모델/음성 오버라이드 (선택) |
+
+> Cloudflare 시크릿이 없으면 **생성·커밋까지만** 수행하고 배포 단계는 자동으로 건너뛴다.
+> 수동 실행은 Actions 탭의 **Run workflow** 로 가능.
+
+### Cloudflare Pages 최초 1회 준비
+
+```bash
+npx wrangler pages project create autocontent   # 프로젝트 생성(1회)
+```
+
 ## 다음 확장 (로드맵)
 
-- **발행 자동화**: `meta.json` → Cloudflare Pages / 티스토리 / 유튜브 자동 업로드
-- **스케줄링**: GitHub Actions 로 매일 트렌드 주제 자동 생성
-- **벡터DB 연동**: 생성한 글을 Chroma/Qdrant 에 임베딩해 중복 방지·재활용
-- **숏폼화**: 썸네일 + 내레이션 → ffmpeg 로 9:16 영상 합성
+- **벡터DB 연동**: 생성한 글을 Chroma/Qdrant 에 임베딩해 주제 중복 방지·재활용
+- **숏폼화**: 썸네일 + 내레이션 → ffmpeg 로 9:16 영상 합성 후 자동 업로드
+- **트렌드 자동 수집**: 큐를 수동 관리 대신 트렌드 API/RSS 로 자동 채우기
