@@ -1,0 +1,98 @@
+name: Daily AutoContent
+
+# 매일 자동으로 큐에서 주제 1건을 생성 → 사이트 빌드 → 커밋 → Cloudflare Pages 배포.
+# 수동 실행도 가능(Actions 탭의 "Run workflow").
+
+on:
+  schedule:
+    - cron: "0 21 * * *"   # 매일 21:00 UTC = 06:00 KST
+  workflow_dispatch:        # 수동 트리거
+
+permissions:
+  contents: write           # 생성 결과를 content/ 로 커밋
+
+concurrency:
+  group: daily-content
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: autocontent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements.txt chromadb
+
+      - name: Ensure ffmpeg (숏폼 영상용)
+        run: ffmpeg -version >/dev/null 2>&1 || sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Refill queue from trends (best-effort)
+        continue-on-error: true
+        run: python fill_queue.py --source trends --geo KR --limit 5
+
+      - name: Generate next topic
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          WRITER_MODEL: ${{ vars.WRITER_MODEL || 'gpt-4o-mini' }}
+          EMBED_MODEL: ${{ vars.EMBED_MODEL || 'text-embedding-3-small' }}
+          TTS_VOICE: ${{ vars.TTS_VOICE || 'ko-KR-SunHiNeural' }}
+        run: python main.py --from-queue topics.txt --out content --dedupe
+
+      - name: Build static site
+        run: python build_site.py --src content --dest site --title "AutoContent" --desc "매일 자동 생성되는 콘텐츠"
+
+      - name: Commit new content
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add content topics.txt
+          if git diff --cached --quiet; then
+            echo "새로 생성된 콘텐츠 없음 — 커밋 생략"
+          else
+            git commit -m "chore: daily content $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Deploy to Cloudflare Pages
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: autocontent
+          command: pages deploy site --project-name=autocontent
+
+      - name: Upload shorts (YouTube / Instagram)
+        continue-on-error: true
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          SITE_BASE_URL: ${{ vars.SITE_BASE_URL }}
+        run: python upload.py --content content
+
+      - name: Commit upload markers
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add content
+          if git diff --cached --quiet; then
+            echo "업로드 마커 변경 없음"
+          else
+            git commit -m "chore: mark uploaded $(date -u +%Y-%m-%d)"
+            git push
+          fi
