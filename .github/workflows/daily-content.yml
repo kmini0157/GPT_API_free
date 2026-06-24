@@ -73,3 +73,26 @@ jobs:
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: autocontent
           command: pages deploy site --project-name=autocontent
+
+      - name: Upload shorts (YouTube / Instagram)
+        continue-on-error: true
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          SITE_BASE_URL: ${{ vars.SITE_BASE_URL }}
+        run: python upload.py --content content
+
+      - name: Commit upload markers
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add content
+          if git diff --cached --quiet; then
+            echo "업로드 마커 변경 없음"
+          else
+            git commit -m "chore: mark uploaded $(date -u +%Y-%m-%d)"
+            git push
+          fi

@@ -134,8 +134,36 @@ python main.py --from-queue topics.txt --out content --dedupe
 영상이 있으면 글 페이지·갤러리에서 ▶ 배지와 함께 영상이 우선 노출된다.
 ffmpeg 가 없으면 자동으로 건너뛴다(GitHub 러너엔 기본 설치).
 
+## 자동 업로드 (YouTube Shorts / Instagram Reels)
+
+생성된 `short.mp4` 를 무료 API로 채널에 자동 게시한다. **자격증명이 있는 채널만** 동작하고,
+이미 올린 글은 `meta.json` 의 `uploaded` 마커로 다시 올리지 않는다.
+
+```bash
+python upload.py                      # 미업로드분 전체, 가능한 채널 모두
+python upload.py --slug my-article    # 특정 글만
+python upload.py --platforms youtube  # 채널 지정
+```
+
+### YouTube 준비 (무료 쿼터 10,000 units/day ≈ 6건/일)
+
+1. Google Cloud 콘솔 → YouTube Data API v3 사용 설정 → OAuth 클라이언트(데스크톱) 생성
+2. 한 번만 로컬에서 `https://www.googleapis.com/auth/youtube.upload` 범위로 인증해 **refresh token** 발급
+3. 시크릿 등록: `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`
+
+### Instagram 준비 (Graph API)
+
+비즈니스/크리에이터 계정 + 연결된 FB 페이지 필요. 릴스는 **공개 mp4 URL**을 요구하므로
+Cloudflare Pages 배포본(`SITE_BASE_URL/<slug>/short.mp4`)을 그대로 쓴다.
+
+- 시크릿: `IG_USER_ID`, `IG_ACCESS_TOKEN`(장기 토큰)
+- 변수: `SITE_BASE_URL` (예: `https://autocontent.pages.dev`)
+
+> 매일 워크플로우는 **Pages 배포 후** 업로드를 실행한다(Instagram이 배포된 공개 URL을 가져가야 하므로).
+> 자격증명이 없으면 업로드 단계는 통째로 건너뛴다.
+
 ## 다음 확장 (로드맵)
 
-- **자동 업로드**: `short.mp4` → 유튜브 Shorts / 인스타 릴스 API 자동 게시
 - **드로우텍스트 자막**: 내레이션 타임코드 기반 자막 번인
 - **A/B 썸네일**: 여러 이미지 프롬프트 생성 후 클릭률로 자동 선택
+- **TikTok / X 게시**: 동일 패턴으로 채널 추가
