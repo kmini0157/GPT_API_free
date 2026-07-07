@@ -14,11 +14,15 @@
 채팅 중 명령어:
     /new            대화 기록 초기화
     /model 모델명    사용 모델 변경
+    /save [파일명]   대화를 마크다운 파일로 저장
+    /usage          오늘 사용량 확인 (로컬 기록 기준)
     /help           도움말
     /exit           종료
 """
 
 import argparse
+import datetime
+import json
 import os
 import sys
 
@@ -29,11 +33,14 @@ except ImportError:
 
 DEFAULT_BASE_URL = "https://api.chatanywhere.org/v1"
 DEFAULT_MODEL = "gpt-4o-mini"
+USAGE_FILE = os.path.join(os.path.expanduser("~"), ".chatanywhere", "usage.json")
 
 HELP_TEXT = """\
 명령어:
   /new            대화 기록 초기화 (새 대화 시작)
   /model 모델명    사용 모델 변경 (예: /model deepseek-r1)
+  /save [파일명]   대화를 마크다운 파일로 저장
+  /usage          오늘 사용량 확인 (로컬 기록 기준)
   /help           이 도움말 표시
   /exit           종료
 
@@ -67,6 +74,61 @@ def parse_args():
     )
     parser.add_argument("--system", default=None, help="시스템 프롬프트")
     return parser.parse_args()
+
+
+def record_usage(model):
+    """오늘 사용 횟수를 ~/.chatanywhere/usage.json 에 기록한다 (usage.py에서 조회)."""
+    try:
+        os.makedirs(os.path.dirname(USAGE_FILE), exist_ok=True)
+        data = {}
+        if os.path.exists(USAGE_FILE):
+            with open(USAGE_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+        today = datetime.date.today().isoformat()
+        day = data.setdefault(today, {})
+        day[model] = day.get(model, 0) + 1
+        for old_date in sorted(data)[:-30]:  # 최근 30일만 보관
+            del data[old_date]
+        with open(USAGE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception:
+        pass  # 사용량 기록 실패가 채팅을 막으면 안 됨
+
+
+def show_usage():
+    """오늘 로컬 기록 기준 사용량을 출력한다."""
+    today = datetime.date.today().isoformat()
+    counts = {}
+    try:
+        with open(USAGE_FILE, encoding="utf-8") as f:
+            counts = json.load(f).get(today, {})
+    except (OSError, ValueError):
+        pass
+    if not counts:
+        print("오늘 이 컴퓨터에서 기록된 사용량이 없습니다.\n")
+        return
+    print(f"오늘({today}) 사용량 (이 컴퓨터의 chat.py/ask.py 기준):")
+    for model, count in sorted(counts.items(), key=lambda x: -x[1]):
+        print(f"  {model}: {count}회")
+    print("전체 사용 기록·잔액은 https://api.chatanywhere.tech/ 에서 Key로 조회할 수 있습니다.\n")
+
+
+def save_conversation(messages, filename=None):
+    """대화 기록을 마크다운 파일로 저장하고 파일명을 반환한다."""
+    if not any(m["role"] != "system" for m in messages):
+        return None
+    if not filename:
+        filename = f"chat-{datetime.datetime.now():%Y%m%d-%H%M%S}.md"
+    role_names = {"system": "시스템", "user": "나", "assistant": "AI"}
+    lines = [f"# 대화 기록 ({datetime.datetime.now():%Y-%m-%d %H:%M})", ""]
+    for m in messages:
+        lines.append(f"## {role_names.get(m['role'], m['role'])}")
+        lines.append("")
+        lines.append(m["content"])
+        lines.append("")
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    return filename
 
 
 def chat_stream(client, model, messages):
@@ -129,6 +191,21 @@ def main():
             else:
                 print(f"현재 모델: {model}  (변경: /model 모델명)\n")
             continue
+        if user_input == "/usage":
+            show_usage()
+            continue
+        if user_input.startswith("/save"):
+            filename = user_input[len("/save"):].strip() or None
+            try:
+                saved = save_conversation(messages, filename)
+            except OSError as e:
+                print(f"저장 실패: {e}\n")
+                continue
+            if saved:
+                print(f"대화를 저장했습니다: {saved}\n")
+            else:
+                print("저장할 대화가 없습니다.\n")
+            continue
 
         messages.append({"role": "user", "content": user_input})
         print(f"\n{model}> ", end="", flush=True)
@@ -147,6 +224,7 @@ def main():
             continue
 
         messages.append({"role": "assistant", "content": reply})
+        record_usage(model)
         print()
 
 

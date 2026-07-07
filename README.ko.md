@@ -4,7 +4,7 @@
 
 GPT · DeepSeek · Claude · Gemini · Grok · Qwen 등을 무료/저가로 사용할 수 있는 OpenAI 호환 API
 
-[무료 Key 발급](https://api.chatanywhere.tech/v1/oauth/free/render) / [공식 API 문서](https://docs.chatanywhere.tech/) / [잔액·사용량 조회](https://api.chatanywhere.tech/) / [서비스 상태](https://status.chatanywhere.tech/) / [中文 README](./README.md)
+[무료 Key 발급](https://api.chatanywhere.tech/v1/oauth/free/render) / [활용 가이드](./USAGE.ko.md) / [공식 API 문서](https://docs.chatanywhere.tech/) / [잔액·사용량 조회](https://api.chatanywhere.tech/) / [서비스 상태](https://status.chatanywhere.tech/) / [中文 README](./README.md)
 
 </div>
 
@@ -72,32 +72,50 @@ curl https://api.chatanywhere.org/v1/chat/completions \
 | 깊은 추론이 필요할 때 | `deepseek-r1` | 하루 30회, 추론 특화 |
 | 최고 품질 (아껴 쓰기) | `gpt-5`, `gpt-4o` | 하루 5회뿐이므로 중요한 질문에만 |
 
-## 대화형 채팅 CLI 바로 쓰기
+## 포함된 도구 — 설치 없이 바로 쓰기
 
-이 저장소에는 터미널에서 바로 대화할 수 있는 [`chat.py`](./chat.py)가 포함되어 있습니다.
+이 저장소에는 터미널에서 바로 쓸 수 있는 도구 3종이 포함되어 있습니다.
+자세한 활용법·레시피는 **[활용 가이드 (USAGE.ko.md)](./USAGE.ko.md)** 를 보세요.
 
 ```bash
 pip install openai
-
-export OPENAI_API_KEY="발급받은_KEY"   # Windows PowerShell: $env:OPENAI_API_KEY="발급받은_KEY"
-python chat.py
+export OPENAI_API_KEY="발급받은_KEY"   # Windows PowerShell: setx OPENAI_API_KEY "발급받은_KEY"
 ```
 
-채팅 중 명령어:
+### [`chat.py`](./chat.py) — 대화형 채팅
+
+```bash
+python chat.py
+```
 
 | 명령어 | 기능 |
 | --- | --- |
 | `/new` | 대화 기록 초기화 (새 대화 시작) |
 | `/model 모델명` | 사용 모델 변경 (예: `/model deepseek-r1`) |
-| `/help` | 도움말 표시 |
-| `/exit` | 종료 |
-
-옵션 예시:
+| `/save [파일명]` | 대화를 마크다운 파일로 저장 |
+| `/usage` | 오늘 사용량 확인 |
+| `/help` / `/exit` | 도움말 / 종료 |
 
 ```bash
 python chat.py --model gpt-5-mini                      # 다른 모델로 시작
 python chat.py --system "당신은 친절한 코딩 튜터입니다."  # 시스템 프롬프트 지정
-python chat.py --base-url https://api.chatanywhere.tech/v1  # 엔드포인트 변경
+```
+
+### [`ask.py`](./ask.py) — 원샷 질문 (파이프 지원)
+
+```bash
+python ask.py "파이썬에서 리스트 뒤집는 법"
+cat 문서.txt | python ask.py -p 요약        # 프리셋: 번역/요약/교정/영작/설명/커밋
+git diff | python ask.py -p 커밋            # diff로 커밋 메시지 생성
+```
+
+### [`usage.py`](./usage.py) — 사용량·한도 확인
+
+```bash
+python usage.py           # 오늘 사용량 + 남은 무료 한도 추정 (로컬 기록 기준)
+python usage.py --remote  # 서버에서 잔액·최근 24시간 사용량 조회 (모든 앱 사용분 포함)
+python usage.py --week    # 최근 7일
+python usage.py --check   # Key 유효성 확인
 ```
 
 ## 코드에서 사용하기
