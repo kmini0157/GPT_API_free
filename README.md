@@ -10,6 +10,8 @@
 
 [快速开始](#如何使用) / [API文档](https://docs.chatanywhere.tech/) / [申请内测免费Key](https://api.chatanywhere.tech/v1/oauth/free/render) / [支持付费Key](https://api.chatanywhere.tech/#/shop/) / [服务可用性](https://status.chatanywhere.tech/)
 
+🇰🇷 [한국어 가이드 (Korean Guide)](./README.ko.md)
+
 [QQ群: 1080471642](https://qm.qq.com/cgi-bin/qm/qr?k=UK3uy_oIge2Hu5s6MYMiFKMm4FMYY6pX&jump_from=webapi&authKey=u7UzKKipRVI6UiMGdKVepJ9SIqbKwKxuUKlgOJoDS3urEnCpDG+WYrHG4VcXS0Ey)
 
 [![](https://status.chatanywhere.org/api/badge/6/uptime/24?labelPrefix=GPT:)](https://status.chatanywhere.tech/)

@@ -1,41 +1,47 @@
+"""
+Dependency install:
+pip install openai
+
+Run:
+export OPENAI_API_KEY="your_key"    (Windows PowerShell: $env:OPENAI_API_KEY="your_key")
+python demo/demo_python.py
+"""
+
+import os
+
 from openai import OpenAI
 
 client = OpenAI(
-    # defaults to os.environ.get("OPENAI_API_KEY")
-    api_key="YOUR API KEY",
-    base_url="https://api.chatanywhere.tech/v1"
+    api_key=os.environ.get("OPENAI_API_KEY", "YOUR API KEY"),
+    base_url="https://api.chatanywhere.tech/v1",
 )
 
+# 무료 Key 기준 하루 200회 사용 가능한 모델 (free tier: 200 requests/day)
+MODEL = "gpt-4o-mini"
 
 
-# 非流式响应
-def gpt_35_api(messages: list):
-    """为提供的对话消息创建新的回答
-
-    Args:
-        messages (list): 完整的对话消息
-    """
-    completion = client.chat.completions.create(model="gpt-3.5-turbo", messages=messages)
+# Non-stream response / 비스트리밍 응답
+def chat_api(messages: list):
+    completion = client.chat.completions.create(model=MODEL, messages=messages)
     print(completion.choices[0].message.content)
 
-def gpt_35_api_stream(messages: list):
-    """为提供的对话消息创建新的回答 (流式传输)
 
-    Args:
-        messages (list): 完整的对话消息
-    """
+# Stream response / 스트리밍 응답
+def chat_api_stream(messages: list):
     stream = client.chat.completions.create(
-        model='gpt-3.5-turbo',
+        model=MODEL,
         messages=messages,
         stream=True,
     )
     for chunk in stream:
-        if chunk.choices[0].delta.content is not None:
-            print(chunk.choices[0].delta.content, end="")
+        if chunk.choices and chunk.choices[0].delta.content is not None:
+            print(chunk.choices[0].delta.content, end="", flush=True)
+    print()
 
-if __name__ == '__main__':
-    messages = [{'role': 'user','content': '鲁迅和周树人的关系'},]
-    # 非流式调用
-    # gpt_35_api(messages)
-    # 流式调用
-    gpt_35_api_stream(messages)
+
+if __name__ == "__main__":
+    messages = [{"role": "user", "content": "안녕하세요! 자기소개 부탁해요."}]
+    # Non-stream call / 비스트리밍 호출
+    # chat_api(messages)
+    # Stream call / 스트리밍 호출
+    chat_api_stream(messages)
